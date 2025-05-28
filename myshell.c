@@ -11,6 +11,8 @@
 #define MAX_ARGS 100
 #define MAX_LINE 1024
 
+char prev_dir[1024] = "";
+
 void sigchld_handler(int sig) {
     (void)sig;
     while (waitpid(-1, NULL, WNOHANG) > 0);
@@ -60,7 +62,29 @@ int is_builtin(char *cmd) {
 
 void exec_builtin(char **args) {
     if (strcmp(args[0], "cd") == 0) {
-        if (args[1]) chdir(args[1]);
+        char cwd[1024];
+        getcwd(cwd, sizeof(cwd));
+
+        if (args[1] == NULL || strcmp(args[1], "~") == 0) {
+            chdir(getenv("HOME"));
+        } else if (strcmp(args[1], "-") == 0) {
+            if (strlen(prev_dir) > 0) {
+                printf("%s\n", prev_dir);
+                chdir(prev_dir);
+            } else {
+                fprintf(stderr, "cd: OLDPWD not set\n");
+            }
+        } else {
+            char *path = args[1];
+            if (path[0] == '~') {
+                char fullpath[1024];
+                snprintf(fullpath, sizeof(fullpath), "%s%s", getenv("HOME"), path + 1);
+                chdir(fullpath);
+            } else {
+                chdir(path);
+            }
+        }
+        strncpy(prev_dir, cwd, sizeof(prev_dir));
     } else if (strcmp(args[0], "exit") == 0) {
         exit(0);
     } else if (strcmp(args[0], "export") == 0) {
